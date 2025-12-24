@@ -79,8 +79,8 @@ static void cleanup_and_exit(int code)
 
     if (runtimefds.pid_fd >= 0)
     {
-        close(runtimefds.stderr_fd);
-        runtimefds.stderr_fd = -1;
+        close(runtimefds.pid_fd);
+        runtimefds.pid_fd = -1;
 
         unlink(option.pid_file);
     }
