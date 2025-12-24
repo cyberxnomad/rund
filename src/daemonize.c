@@ -51,7 +51,7 @@ int test_running(const char *pid_file)
     int fd = open(pid_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd < 0)
     {
-        fprintf(stderr, "failed to open %s: %s", pid_file, strerror(errno));
+        fprintf(stderr, "failed to open %s: %s\n", pid_file, strerror(errno));
         return -1;
     }
 
@@ -98,7 +98,7 @@ int daemonize(const char *pid_file)
 
         if (pipe(pipefd) < 0)
         {
-            fprintf(stderr, "failed to create pipe: %s", strerror(errno));
+            fprintf(stderr, "failed to create pipe: %s\n", strerror(errno));
             return -1;
         }
     }
@@ -106,7 +106,7 @@ int daemonize(const char *pid_file)
     pid = fork();
     if (pid < 0)
     {
-        fprintf(stderr, "failed to fork: %s", strerror(errno));
+        fprintf(stderr, "failed to fork: %s\n", strerror(errno));
 
         close(pipefd[0]);
         close(pipefd[1]);
