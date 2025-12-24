@@ -305,6 +305,11 @@ static int general_parse_file(char **dst, const char *file)
 
     snprintf(buf2, sizeof(buf2), "%s/%s", dir, base_name);
 
+    if (*dst)
+    {
+        free(*dst);
+    }
+
     *dst = strdup(buf2);
 
     return 0;
@@ -384,6 +389,11 @@ static int parse_working_dir(option_t *opt, const char *dir)
     {
         fprintf(stderr, "%s: not a directory\n", abs_path);
         return -1;
+    }
+
+    if (opt->working_dir)
+    {
+        free(opt->working_dir);
     }
 
     opt->working_dir = strdup(abs_path);
