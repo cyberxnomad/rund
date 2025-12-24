@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.15.0)
 set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
 
-# Setup project, output and linker file
+# Setup project
 project(rund)
 
 set(EXECUTABLE ${PROJECT_NAME})
