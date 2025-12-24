@@ -15,7 +15,10 @@
 #define _INTERNAL_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
+
+#define RESPAWN_CODE_BITS_ARRAY_SIZE 4
 
 typedef struct
 {
@@ -25,8 +28,7 @@ typedef struct
     char **environments;
     size_t environment_cnt;
     bool respawn;
-    int *respawn_codes;
-    size_t respawn_code_cnt;
+    uint32_t respawn_code_bits[RESPAWN_CODE_BITS_ARRAY_SIZE];
     int respawn_delay;
     int max_respawn_cnt;
 
@@ -35,11 +37,8 @@ typedef struct
     char **target_argv;
 } option_t;
 
-#define OPTION_INITIALIZER {NULL, NULL, NULL, \
-                            NULL, 0,          \
-                            false, NULL, 0,   \
-                            3, 0,             \
-                            NULL, 0, NULL}
+#define OPTION_INITIALIZER \
+    {NULL, NULL, NULL, NULL, 0, false, {-2U, -1U, -1U, -1U}, 3, 0, NULL, 0, NULL}
 
 void free_option(option_t *opt);
 int parse_option(int argc, char **argv, option_t *opt);

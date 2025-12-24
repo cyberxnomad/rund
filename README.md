@@ -60,6 +60,7 @@ Use '--' to separate options from target program and its arguments.
 | `-r` | `--respawn` | Automatically respawn target on abnormal exit |
 | | `--respawn-code=CODE` | Respawn when exit code equals CODE |
 | | | Can be used multiple times |
+| | | Use -1 to respawn on any exit code |
 | | | Default: respawn on all non-zero exit codes |
 | | `--respawn-delay=N` | Wait N seconds before respawning (default: 3) |
 | | `--max-respawns=N` | Maximum respawn attempts (default: 0 = unlimited) |

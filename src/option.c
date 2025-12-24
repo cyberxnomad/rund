@@ -69,6 +69,7 @@ static const char usage_text[] = {
     " -r, --respawn              Automatically respawn target on abnormal exit\n"
     "     --respawn-code=CODE    Respawn when exit code equals CODE\n"
     "                            Can be used multiple times\n"
+    "                            Use -1 to respawn on any exit code\n"
     "                            Default: respawn on all non-zero exit codes\n"
     "     --respawn-delay=N      Wait N seconds before respawning (default: 3)\n"
     "     --max-respawns=N       Maximum respawn attempts (default: 0 = unlimited)\n"
@@ -118,7 +119,7 @@ static int append_env(option_t *opt, const char *env)
 }
 
 /**
- * @brief Append respawn code to option
+ * @brief Parse respawn code
  *
  * @param opt option
  * @param code_str code string
@@ -126,7 +127,7 @@ static int append_env(option_t *opt, const char *env)
  * @retval `0` ok
  * @retval `-1` failed
  */
-static int append_respawn_code(option_t *opt, const char *code_str)
+static int parse_respawn_code(option_t *opt, const char *code_str)
 {
     if (!code_str)
     {
@@ -135,9 +136,9 @@ static int append_respawn_code(option_t *opt, const char *code_str)
 
     char *endptr = NULL;
     long code = strtol(code_str, &endptr, 10);
-    if (errno == ERANGE || code > 127 || code < 0)
+    if (errno == ERANGE || code > 127 || code < -1)
     {
-        fprintf(stderr, "failed to parse respawn code '%s': out of range (0~127)\n", code_str);
+        fprintf(stderr, "failed to parse respawn code '%s': out of range [-1, 127]\n", code_str);
         return -1;
     }
     else if (code_str == endptr || *endptr != '\0')
@@ -146,17 +147,27 @@ static int append_respawn_code(option_t *opt, const char *code_str)
         return -1;
     }
 
-    int *temp = (int *)realloc(opt->respawn_codes, (opt->respawn_code_cnt + 1) * sizeof(int *));
-    if (!temp)
+    if (code == -1)
     {
-        fprintf(stderr, "%s", strerror(errno));
-        return -1;
+        // -1 means any status code
+        for (int i = 0; i < RESPAWN_CODE_BITS_ARRAY_SIZE; i++)
+        {
+            opt->respawn_code_bits[i] = -1U;
+        }
     }
+    else
+    {
+        for (int i = 0; i < RESPAWN_CODE_BITS_ARRAY_SIZE; i++)
+        {
+            if (code < 32)
+            {
+                opt->respawn_code_bits[i] |= 1 << code;
+                break;
+            }
 
-    opt->respawn_codes = temp;
-    opt->respawn_codes[opt->respawn_code_cnt] = code;
-
-    opt->respawn_code_cnt++;
+            code -= 32;
+        }
+    }
 
     return 0;
 }
@@ -458,12 +469,7 @@ void free_option(option_t *opt)
         opt->environment_cnt = 0;
     }
 
-    if (opt->respawn_codes)
-    {
-        free(opt->respawn_codes);
-        opt->respawn_codes = NULL;
-        opt->respawn_code_cnt = 0;
-    }
+    memset(opt->respawn_code_bits, 0, sizeof(opt->respawn_code_bits));
 
     opt->respawn = false;
     opt->target = NULL;
@@ -487,6 +493,7 @@ int parse_option(int argc, char **argv, option_t *opt)
     int rc;
     int cur;
     char *entry = argv[0];
+    bool respawn_code_modified = false;
 
     while ((cur = getopt_long(argc, argv, short_opts, long_opts, NULL)) != EOF)
     {
@@ -515,7 +522,13 @@ int parse_option(int argc, char **argv, option_t *opt)
             break;
 
         case OPT_RESPAWN_CODE:
-            rc = append_respawn_code(opt, optarg);
+            if (!respawn_code_modified)
+            {
+                // clear default values
+                memset(opt->respawn_code_bits, 0, sizeof(opt->respawn_code_bits));
+                respawn_code_modified = true;
+            }
+            rc = parse_respawn_code(opt, optarg);
             break;
 
         case OPT_RESPAWN_DELAY:
