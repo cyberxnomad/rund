@@ -39,7 +39,11 @@ enum
     OPT_MAX_RESPAWNS,
 };
 
-static const char *short_opts = "o:e:c:E:rhV";
+// short options
+// use the "+" prefix to prevent getopt_long from rearranging the order of argv.
+static const char *short_opts = "+o:e:c:E:p:rhV";
+
+// long options
 static const struct option long_opts[] = {
     {"stdout", required_argument, NULL, OPT_STDOUT},
     {"stderr", required_argument, NULL, OPT_STDERR},
@@ -55,22 +59,21 @@ static const struct option long_opts[] = {
 };
 
 static const char usage_text[] = {
-    "usage: %s [options...] -- <target> [args...]\n"
+    "usage: %s [options...] <target> [target_args...]\n"
     "\n"
-    "Run a target program with specified options and control its behavior.\n"
-    "Use '--' to separate options from target program and its arguments.\n"
+    "A lightweight daemonizer and process supervisor.\n"
     "\n"
     "Options:\n"
     " -o, --stdout=FILE          Redirect stdout to FILE (default: /dev/null)\n"
     " -e, --stderr=FILE          Redirect stderr to FILE (default: /dev/null)\n"
     " -c, --chdir=DIR            Change working directory to DIR\n"
     " -E, --env=NAME=VALUE       Set environment variable\n"
-    "                            Can be used multiple times\n"
-    " -r, --respawn              Automatically respawn target on abnormal exit\n"
-    "     --respawn-code=CODE    Respawn when exit code equals CODE\n"
-    "                            Can be used multiple times\n"
-    "                            Use -1 to respawn on any exit code\n"
-    "                            Default: respawn on all non-zero exit codes\n"
+    "                              Can be used multiple times\n"
+    " -r, --respawn              Enable auto-respawn on exit\n"
+    "     --respawn-code=CODE    Respawn only if exit code equals CODE\n"
+    "                              Can be used multiple times\n"
+    "                              Use -1 for any codes\n"
+    "                              Default: any non-zero codes (if -r is set)\n"
     "     --respawn-delay=N      Wait N seconds before respawning (default: 3)\n"
     "     --max-respawns=N       Maximum respawn attempts (default: 0 = unlimited)\n"
     " -h, --help                 Display this help message and exit\n"
@@ -80,11 +83,11 @@ static const char usage_text[] = {
 /**
  * @brief Show usages
  *
- * @param entry program entry, typically `argv[0]`
+ * @param prog_name program name
  */
-static void show_usage(const char *entry)
+static void show_usage(const char *prog_name)
 {
-    fprintf(stderr, usage_text, basename((char *)entry));
+    fprintf(stderr, usage_text, prog_name);
 }
 
 /**
@@ -492,8 +495,8 @@ int parse_option(int argc, char **argv, option_t *opt)
 {
     int rc;
     int cur;
-    char *entry = argv[0];
-    bool respawn_code_modified = false;
+    char *prog_name = basename(argv[0]);
+    bool has_respawn_code = false;
 
     while ((cur = getopt_long(argc, argv, short_opts, long_opts, NULL)) != EOF)
     {
@@ -522,11 +525,11 @@ int parse_option(int argc, char **argv, option_t *opt)
             break;
 
         case OPT_RESPAWN_CODE:
-            if (!respawn_code_modified)
+            if (!has_respawn_code)
             {
                 // clear default values
                 memset(opt->respawn_code_bits, 0, sizeof(opt->respawn_code_bits));
-                respawn_code_modified = true;
+                has_respawn_code = true;
             }
             rc = parse_respawn_code(opt, optarg);
             break;
@@ -545,12 +548,12 @@ int parse_option(int argc, char **argv, option_t *opt)
             break;
 
         case OPT_HELP:
-            show_usage(entry);
+            show_usage(prog_name);
             return 0;
             break;
 
         default:
-            show_usage(entry);
+            show_usage(prog_name);
             rc = -1;
             break;
         }
@@ -561,40 +564,22 @@ int parse_option(int argc, char **argv, option_t *opt)
         }
     }
 
-    int dash_dash_index = -1;
-
-    for (int i = 0; i < argc; i++)
-    {
-        if (0 == strcmp(argv[i], "--"))
-        {
-            dash_dash_index = i;
-            break;
-        }
-    }
-
-    if (dash_dash_index < 0)
-    {
-        fprintf(stderr, "error: missing '--' separator\n");
-        show_usage(entry);
-        return -1;
-    }
-
-    if (dash_dash_index + 1 >= argc)
+    if (optind >= argc)
     {
         fprintf(stderr, "error: missing target program\n");
-        show_usage(entry);
+        show_usage(prog_name);
         return -1;
     }
 
-    rc = check_target(argv[dash_dash_index + 1]);
+    rc = check_target(argv[optind]);
     if (rc < 0)
     {
         return rc;
     }
 
-    opt->target = argv[dash_dash_index + 1];
-    opt->target_argc = argc - (dash_dash_index + 1);
-    opt->target_argv = &argv[dash_dash_index + 1];
+    opt->target = argv[optind];
+    opt->target_argc = argc - optind;
+    opt->target_argv = &argv[optind];
 
     return 1;
 }
