@@ -154,7 +154,9 @@ static void graceful_shutdown(pid_t pid, const option_t *opt)
     }
 
     int rc;
-    int timeout_cnt = 5 * 5;
+    // 10 seconds
+    // *improve: make it configurable
+    int timeout_cnt = 5 * 10;
 
     // send SIGTERM first
     kill(pid, SIGTERM);
