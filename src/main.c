@@ -171,8 +171,8 @@ static void graceful_shutdown(pid_t pid, const option_t *opt)
         timeout_cnt--;
     }
 
-    // timedout and force to kill
-    syslog(LOG_WARNING, "wait for %s exit timedout, force terminate it", opt->target);
+    // timed out and force to kill
+    syslog(LOG_WARNING, "waiting for %s to exit timed out; force terminating it", opt->target);
     kill(pid, SIGKILL);
 
     waitpid(pid, NULL, 0);
@@ -299,20 +299,26 @@ int main(int argc, char **argv)
             {
                 respawn_required = option.respawn;
 
+                // check the exit status of the child process
                 if (WIFEXITED(status))
                 {
-                    syslog(LOG_WARNING, "%s is exited, status: %d", option.target, WEXITSTATUS(status));
+                    // child exited normally
+                    // check if respawn is needed
+                    syslog(LOG_WARNING, "%s exited, status: %d", option.target, WEXITSTATUS(status));
                     respawn_required = check_respawn_required(&option, WEXITSTATUS(status));
                 }
                 else if (WIFSIGNALED(status))
                 {
-                    syslog(LOG_WARNING, "%s is exited, signal: %s (%d)", option.target, strsignal(WTERMSIG(status)), WTERMSIG(status));
+                    // child terminated by a signal
+                    syslog(LOG_WARNING, "%s exited, signal: %s (%d)", option.target, strsignal(WTERMSIG(status)), WTERMSIG(status));
                 }
                 else
                 {
-                    syslog(LOG_WARNING, "%s is exited abnormal", option.target);
+                    // child exited abnormally without a clear signal or exit status
+                    syslog(LOG_WARNING, "%s exited abnormal", option.target);
                 }
 
+                // increment respawn counter and check against the configured maximum
                 respawn_cnt++;
                 if (option.max_respawn_cnt && respawn_cnt > option.max_respawn_cnt)
                 {
@@ -321,6 +327,7 @@ int main(int argc, char **argv)
                     cleanup_and_exit(EXIT_SUCCESS);
                 }
 
+                // exit if respawning is not required
                 if (!respawn_required)
                 {
                     syslog(LOG_INFO, "%s exited", prog_name);
@@ -337,6 +344,7 @@ int main(int argc, char **argv)
                     syslog(LOG_INFO, "%s respawning immediately", option.target);
                 }
 
+                // exit the loop to respawn the child process
                 break;
             }
 
