@@ -27,6 +27,7 @@ typedef struct
     char *working_dir;
     char **environments;
     size_t environment_cnt;
+    char *pid_file;
     bool respawn;
     uint32_t respawn_code_bits[RESPAWN_CODE_BITS_ARRAY_SIZE];
     int respawn_delay;
@@ -38,20 +39,20 @@ typedef struct
 } option_t;
 
 #define OPTION_INITIALIZER \
-    {NULL, NULL, NULL, NULL, 0, false, {-2U, -1U, -1U, -1U}, 3, 0, NULL, 0, NULL}
+    {NULL, NULL, NULL, NULL, 0, NULL, false, {-2U, -1U, -1U, -1U}, 3, 0, NULL, 0, NULL}
 
 void free_option(option_t *opt);
 int parse_option(int argc, char **argv, option_t *opt);
 
 typedef struct
 {
-    int stdin_fd;
     int stdout_fd;
     int stderr_fd;
-} stdfds_t;
+    int pid_fd;
+} runtimefds_t;
 
-#define STDFDS_INITIALIZER {-1, -1, -1}
+#define RUNTIMEFDS_INITIALIZER {-1, -1, -1}
 
-int daemonize(void);
+int daemonize(const char *pid_file);
 
 #endif // _INTERNAL_H_

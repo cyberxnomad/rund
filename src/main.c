@@ -25,7 +25,7 @@
 #include "internal.h"
 
 static option_t option = OPTION_INITIALIZER;
-static stdfds_t stdfds = STDFDS_INITIALIZER;
+static runtimefds_t runtimefds = RUNTIMEFDS_INITIALIZER;
 
 static volatile sig_atomic_t shutdown_requested = 0;
 
@@ -65,25 +65,27 @@ static bool check_respawn_required(const option_t *opt, int code)
  */
 static void cleanup_and_exit(int code)
 {
+    if (runtimefds.stdout_fd >= 0)
+    {
+        close(runtimefds.stdout_fd);
+        runtimefds.stdout_fd = -1;
+    }
+
+    if (runtimefds.stderr_fd >= 0)
+    {
+        close(runtimefds.stderr_fd);
+        runtimefds.stderr_fd = -1;
+    }
+
+    if (runtimefds.pid_fd >= 0)
+    {
+        close(runtimefds.stderr_fd);
+        runtimefds.stderr_fd = -1;
+
+        unlink(option.pid_file);
+    }
+
     free_option(&option);
-
-    if (stdfds.stdin_fd >= 0)
-    {
-        close(stdfds.stdin_fd);
-        stdfds.stdin_fd = -1;
-    }
-
-    if (stdfds.stdout_fd >= 0)
-    {
-        close(stdfds.stdout_fd);
-        stdfds.stdout_fd = -1;
-    }
-
-    if (stdfds.stderr_fd >= 0)
-    {
-        close(stdfds.stderr_fd);
-        stdfds.stderr_fd = -1;
-    }
 
     exit(code);
 }
@@ -94,7 +96,7 @@ static void cleanup_and_exit(int code)
  * @param opt option
  * @param fds standard file descriptor
  */
-static void redirect_std_fds(const option_t *opt, stdfds_t *fds)
+static void redirect_std_fds(const option_t *opt, runtimefds_t *fds)
 {
     if (option.stdout_file)
     {
@@ -231,10 +233,14 @@ int main(int argc, char **argv)
 
     openlog(prog_name, LOG_PID, LOG_DAEMON);
 
-    rc = daemonize();
-    if (rc != 0)
+    rc = daemonize(option.pid_file);
+    if (rc < 0)
     {
         cleanup_and_exit(EXIT_FAILURE);
+    }
+    if (rc > 0)
+    {
+        runtimefds.pid_fd = rc;
     }
 
     pid_t pid;
@@ -266,7 +272,7 @@ int main(int argc, char **argv)
 
             set_environments(&option);
 
-            redirect_std_fds(&option, &stdfds);
+            redirect_std_fds(&option, &runtimefds);
 
             syslog(LOG_INFO, "start to execute %s", option.target);
 

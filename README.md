@@ -47,22 +47,23 @@ rund [options...] <target> [target_args...]
 
 ### Options
 
-| Short | Long | Description |
-|-------|------|-------------|
-| `-o` | `--stdout=FILE` | Redirect stdout to FILE (default: /dev/null) |
-| `-e` | `--stderr=FILE` | Redirect stderr to FILE (default: /dev/null) |
-| `-c` | `--chdir=DIR` | Change working directory to DIR |
-| `-E` | `--env=NAME=VALUE` | Set environment variable |
-| | | Can be used multiple times |
-| `-r` | `--respawn` | Enable auto-respawn on exit |
-| | `--respawn-code=CODE` | Respawn only if exit code equals CODE |
-| | | Can be used multiple times |
-| | | Use -1 for any codes
-| | | Default: any non-zero codes (if -r is set) |
-| | `--respawn-delay=N` | Wait N seconds before respawning (default: 3) |
-| | `--max-respawns=N` | Maximum respawn attempts (default: 0 = unlimited) |
-| `-h` | `--help` | Display this help message and exit |
-| `-V` | `--version` | Show version information and exit |
+| Short | Long                  | Description                                       |
+|-------|-----------------------|---------------------------------------------------|
+| `-o`  | `--stdout=FILE`       | Redirect stdout to FILE (default: /dev/null)      |
+| `-e`  | `--stderr=FILE`       | Redirect stderr to FILE (default: /dev/null)      |
+| `-c`  | `--chdir=DIR`         | Change working directory to DIR                   |
+| `-E`  | `--env=NAME=VALUE`    | Set environment variable                          |
+|       |                       | Can be used multiple times                        |
+| `-p`  | `--pidfile=FILE`      | Write PID to FILE                                 |
+| `-r`  | `--respawn`           | Enable auto-respawn on exit                       |
+|       | `--respawn-code=CODE` | Respawn only if exit code equals CODE             |
+|       |                       | Can be used multiple times                        |
+|       |                       | Use -1 for any codes                              |
+|       |                       | Default: any non-zero codes (if -r is set)        |
+|       | `--respawn-delay=N`   | Wait N seconds before respawning (default: 3)     |
+|       | `--max-respawns=N`    | Maximum respawn attempts (default: 0 = unlimited) |
+| `-h`  | `--help`              | Display this help message and exit                |
+| `-V`  | `--version`           | Show version information and exit                 |
 
 ### Examples
 

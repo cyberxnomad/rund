@@ -31,6 +31,7 @@ enum
     OPT_STDERR = 'e',
     OPT_CHDIR = 'c',
     OPT_ENV = 'E',
+    OPT_PIDFILE = 'p',
     OPT_RESPAWN = 'r',
     OPT_HELP = 'h',
     OPT_VERSION = 'V',
@@ -49,6 +50,7 @@ static const struct option long_opts[] = {
     {"stderr", required_argument, NULL, OPT_STDERR},
     {"chdir", required_argument, NULL, OPT_CHDIR},
     {"env", required_argument, NULL, OPT_ENV},
+    {"pidfile", required_argument, NULL, OPT_PIDFILE},
     {"respawn", no_argument, NULL, OPT_RESPAWN},
     {"respawn-code", required_argument, NULL, OPT_RESPAWN_CODE},
     {"respawn-delay", required_argument, NULL, OPT_RESPAWN_DELAY},
@@ -69,6 +71,7 @@ static const char usage_text[] = {
     " -c, --chdir=DIR            Change working directory to DIR\n"
     " -E, --env=NAME=VALUE       Set environment variable\n"
     "                              Can be used multiple times\n"
+    " -p, --pidfile=FILE         Write PID to FILE\n"
     " -r, --respawn              Enable auto-respawn on exit\n"
     "     --respawn-code=CODE    Respawn only if exit code equals CODE\n"
     "                              Can be used multiple times\n"
@@ -389,6 +392,20 @@ static int parse_working_dir(option_t *opt, const char *dir)
 }
 
 /**
+ * @brief Parse pid file path
+ *
+ * @param opt option
+ * @param file file path
+ * @return int
+ * @retval `0` ok
+ * @retval `-1` failed
+ */
+static int parse_pid_file(option_t *opt, const char *file)
+{
+    return general_parse_file(&opt->pid_file, file);
+}
+
+/**
  * @brief Check whether the target program is valid
  *
  * @param target target program path
@@ -472,6 +489,12 @@ void free_option(option_t *opt)
         opt->environment_cnt = 0;
     }
 
+    if (opt->pid_file)
+    {
+        free(opt->pid_file);
+        opt->pid_file = NULL;
+    }
+
     memset(opt->respawn_code_bits, 0, sizeof(opt->respawn_code_bits));
 
     opt->respawn = false;
@@ -518,6 +541,10 @@ int parse_option(int argc, char **argv, option_t *opt)
 
         case OPT_ENV:
             rc = append_env(opt, optarg);
+            break;
+
+        case OPT_PIDFILE:
+            rc = parse_pid_file(opt, optarg);
             break;
 
         case OPT_RESPAWN:
