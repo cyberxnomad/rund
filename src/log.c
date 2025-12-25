@@ -17,16 +17,25 @@
 
 #include "internal.h"
 
+// Mapping of log levels to syslog priorities
 static const int syslog_levels[] = {
-    LOG_DEBUG,
-    LOG_INFO,
-    LOG_WARNING,
-    LOG_ERR,
-    LOG_CRIT,
+    LOG_DEBUG,   // LOG_LEVEL_DEBUG
+    LOG_INFO,    // LOG_LEVEL_INFO
+    LOG_WARNING, // LOG_LEVEL_WARN
+    LOG_ERR,     // LOG_LEVEL_ERROR
+    LOG_CRIT,    // LOG_LEVEL_FATAL
 };
 
+// Indicating whether syslog output is enabled
 static volatile bool syslog_enabled = false;
 
+/**
+ * @brief Initialize logger
+ *
+ * @param ident program identity
+ * @return int
+ * @retval `0` ok
+ */
 int log_init(const char *ident)
 {
     openlog(ident, LOG_PID, LOG_DAEMON);
@@ -34,11 +43,24 @@ int log_init(const char *ident)
     return 0;
 }
 
+/**
+ * @brief Enable syslog output for log messages
+ *
+ */
 void log_enable_syslog(void)
 {
     syslog_enabled = true;
 }
 
+/**
+ * @brief Log a message with the specified level and format
+ *
+ * @param level the log level (LOG_LEVEL_DEBUG, LOG_LEVEL_INFO, etc.)
+ * @param fmt the format string for the log message
+ * @param ... variable arguments for the format string
+ *
+ * @note Messages with level > LOG_LEVEL_FATAL are silently ignored
+ */
 void log_log(enum LOG_LEVEL level, const char *fmt, ...)
 {
     if (level > LOG_LEVEL_FATAL)
