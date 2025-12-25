@@ -108,8 +108,12 @@ int daemonize(const char *pid_file)
     {
         fprintf(stderr, "failed to fork: %s\n", strerror(errno));
 
-        close(pipefd[0]);
-        close(pipefd[1]);
+        if (pid_file)
+        {
+            close(pipefd[0]);
+            close(pipefd[1]);
+        }
+
         return -1;
     }
     else if (pid > 0)
@@ -154,10 +158,17 @@ int daemonize(const char *pid_file)
     umask(0);
     chdir("/");
 
-    int null_fd = open("/dev/null", O_WRONLY);
+    int null_fd = open("/dev/null", O_RDWR);
     if (null_fd < 0)
     {
         syslog(LOG_ERR, "failed to open /dev/null: %s", strerror(errno));
+
+        if (pid_file)
+        {
+            close(pid_fd);
+            unlink(pid_file);
+        }
+
         return -1;
     }
 
