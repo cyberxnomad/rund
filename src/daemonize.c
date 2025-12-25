@@ -155,7 +155,7 @@ int daemonize(const char *pid_file)
 
     // detach previously process session
     setsid();
-    umask(0);
+    umask(022);
     chdir("/");
 
     int null_fd = open("/dev/null", O_RDWR);

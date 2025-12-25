@@ -362,7 +362,7 @@ int main(int argc, char **argv)
             }
 
             setsid();
-            umask(0);
+            umask(022);
 
             if (option.working_dir)
             {
