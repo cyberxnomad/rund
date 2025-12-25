@@ -7,6 +7,7 @@ A lightweight daemonizer and process supervisor.
 - Daemonize any process
 - Process respawn with configurable conditions
 - Custom working directory
+- Run as a specific user/group
 - Environment variable support
 - Standard output/error redirection
 - Graceful shutdown handling
@@ -52,6 +53,7 @@ rund [options...] <target> [target_args...]
 | `-o`  | `--stdout=FILE`       | Redirect stdout to FILE (default: /dev/null)      |
 | `-e`  | `--stderr=FILE`       | Redirect stderr to FILE (default: /dev/null)      |
 | `-c`  | `--chdir=DIR`         | Change working directory to DIR                   |
+| `-u`  | `--user=USER[:GROUP]` | Run target as USER and optionally GROUP           |
 | `-E`  | `--env=NAME=VALUE`    | Set environment variable                          |
 |       |                       | Can be used multiple times                        |
 | `-p`  | `--pidfile=FILE`      | Write PID to FILE                                 |

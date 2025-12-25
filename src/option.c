@@ -8,13 +8,16 @@
  * @section Changelog
  * Date         Author                          Notes
  * 2025-12-22   Frank <uuidxx@163.com>          the first version
+ * 2025-12-25   Frank <uuidxx@163.com>          add support for running user
  *
  */
 
 #include <errno.h>
 #include <getopt.h>
+#include <grp.h>
 #include <libgen.h>
 #include <limits.h>
+#include <pwd.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +33,7 @@ enum
     OPT_STDOUT = 'o',
     OPT_STDERR = 'e',
     OPT_CHDIR = 'c',
+    OPT_USER = 'u',
     OPT_ENV = 'E',
     OPT_PIDFILE = 'p',
     OPT_RESPAWN = 'r',
@@ -42,13 +46,14 @@ enum
 
 // short options
 // use the "+" prefix to prevent getopt_long from rearranging the order of argv.
-static const char *short_opts = "+o:e:c:E:p:rhV";
+static const char *short_opts = "+o:e:c:u:E:p:rhV";
 
 // long options
 static const struct option long_opts[] = {
     {"stdout", required_argument, NULL, OPT_STDOUT},
     {"stderr", required_argument, NULL, OPT_STDERR},
     {"chdir", required_argument, NULL, OPT_CHDIR},
+    {"user", required_argument, NULL, OPT_USER},
     {"env", required_argument, NULL, OPT_ENV},
     {"pidfile", required_argument, NULL, OPT_PIDFILE},
     {"respawn", no_argument, NULL, OPT_RESPAWN},
@@ -69,6 +74,7 @@ static const char usage_text[] = {
     " -o, --stdout=FILE          Redirect stdout to FILE (default: /dev/null)\n"
     " -e, --stderr=FILE          Redirect stderr to FILE (default: /dev/null)\n"
     " -c, --chdir=DIR            Change working directory to DIR\n"
+    " -u, --user=USER[:GROUP]    Run target as USER and optionally GROUP\n"
     " -E, --env=NAME=VALUE       Set environment variable\n"
     "                              Can be used multiple times\n"
     " -p, --pidfile=FILE         Write PID to FILE\n"
@@ -402,6 +408,76 @@ static int parse_working_dir(option_t *opt, const char *dir)
 }
 
 /**
+ * @brief Parse user and group
+ *
+ * @param opt option
+ * @param user_str user string, format: USER[:GROUP]
+ * @return int
+ * @retval `0` ok
+ * @retval `-1` failed
+ */
+static int parse_user(option_t *opt, const char *user_str)
+{
+    if (!user_str)
+    {
+        return -1;
+    }
+
+    char *group = NULL,
+         *sep = NULL;
+    size_t username_len = strlen(user_str);
+
+    sep = strchr(user_str, ':');
+    if (sep)
+    {
+        group = sep + 1;
+        username_len = sep - user_str;
+    }
+
+    char *username = strndup(user_str, username_len);
+
+    struct passwd *pw = getpwnam(username);
+    if (!pw)
+    {
+        fprintf(stderr, "error: user '%s' not found\n", username);
+        free(username);
+        return -1;
+    }
+
+    uid_t uid = pw->pw_uid;
+    gid_t gid = pw->pw_gid;
+
+    // group specified
+    if (group && *group != '\0')
+    {
+        struct group *grp = getgrnam(group);
+        if (!grp)
+        {
+            fprintf(stderr, "error: group '%s' not found\n", group);
+            return -1;
+        }
+
+        gid = grp->gr_gid;
+    }
+
+    if (opt->user)
+    {
+        free(opt->user);
+    }
+    if (opt->home_dir)
+    {
+        free(opt->home_dir);
+    }
+
+    opt->user = username;
+    opt->home_dir = strdup(pw->pw_dir);
+    opt->uid = uid;
+    opt->gid = gid;
+
+    return 0;
+}
+
+/**
  * @brief Parse pid file path
  *
  * @param opt option
@@ -487,6 +563,21 @@ void free_option(option_t *opt)
         opt->working_dir = NULL;
     }
 
+    if (opt->user)
+    {
+        free(opt->user);
+        opt->user = NULL;
+    }
+
+    if (opt->home_dir)
+    {
+        free(opt->home_dir);
+        opt->home_dir = NULL;
+    }
+
+    opt->uid = 0;
+    opt->gid = 0;
+
     if (opt->environments)
     {
         for (int i = 0; i < opt->environment_cnt; i++)
@@ -547,6 +638,10 @@ int parse_option(int argc, char **argv, option_t *opt)
 
         case OPT_CHDIR:
             rc = parse_working_dir(opt, optarg);
+            break;
+
+        case OPT_USER:
+            rc = parse_user(opt, optarg);
             break;
 
         case OPT_ENV:

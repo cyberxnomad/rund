@@ -8,11 +8,13 @@
  * @section Changelog
  * Date         Author                          Notes
  * 2025-12-19   Frank <uuidxx@163.com>          the first version
+ * 2025-12-25   Frank <uuidxx@163.com>          add support for running user
  *
  */
 
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <libgen.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -23,6 +25,12 @@
 #include <unistd.h>
 
 #include "internal.h"
+
+// Exit code used by the child process when execv() fails.
+// This is a reserved internal status code (254) to distinguish between
+// a failure in the supervisor's setup and the target program's own exit status.
+// Value 254 is used as it is rarely used by standard applications.
+#define CHILD_EXEC_ERR_CODE 254
 
 static option_t option = OPTION_INITIALIZER;
 static runtimefds_t runtimefds = RUNTIMEFDS_INITIALIZER;
@@ -123,6 +131,51 @@ static void redirect_std_fds(const option_t *opt, runtimefds_t *fds)
             syslog(LOG_ERR, "failed to open %s: %s", option.stderr_file, strerror(errno));
         }
     }
+}
+
+/**
+ * @brief Set user and group
+ *
+ * @param opt option
+ * @return int
+ * @retval `0` ok
+ * @retval `-1` failed
+ */
+static int set_user_and_group(const option_t *opt)
+{
+    if (!opt->user)
+    {
+        return 0;
+    }
+
+    int rc;
+
+    rc = initgroups(opt->user, opt->gid);
+    if (rc < 0)
+    {
+        syslog(LOG_ERR, "failed to init groups: %s", strerror(errno));
+        return -1;
+    }
+
+    rc = setgid(opt->gid);
+    if (rc < 0)
+    {
+        syslog(LOG_ERR, "failed to set group: %s", strerror(errno));
+        return -1;
+    }
+
+    rc = setuid(opt->gid);
+    if (rc < 0)
+    {
+        syslog(LOG_ERR, "failed to set user: %s", strerror(errno));
+        return -1;
+    }
+
+    setenv("USER", opt->user, 1);
+    setenv("LOGNAME", opt->user, 1);
+    setenv("HOME", opt->home_dir, 1);
+
+    return 0;
 }
 
 /**
@@ -255,7 +308,7 @@ int main(int argc, char **argv)
         {
             syslog(LOG_ERR, "failed to fork: %s", strerror(errno));
 
-            syslog(LOG_INFO, "%s exited", prog_name);
+            syslog(LOG_ERR, "%s exited", prog_name);
             cleanup_and_exit(EXIT_FAILURE);
         }
         else if (pid == 0)
@@ -274,14 +327,18 @@ int main(int argc, char **argv)
 
             redirect_std_fds(&option, &runtimefds);
 
+            // switch user
+            rc = set_user_and_group(&option);
+            if (rc < 0)
+            {
+                exit(CHILD_EXEC_ERR_CODE);
+            }
+
             syslog(LOG_INFO, "start to execute %s", option.target);
 
             execv(option.target, option.target_argv);
 
-            syslog(LOG_ERR, "failed to execute %s: %s", option.target, strerror(errno));
-
-            syslog(LOG_INFO, "%s exited", prog_name);
-            cleanup_and_exit(EXIT_FAILURE);
+            exit(CHILD_EXEC_ERR_CODE);
         }
 
         // here is parent process
@@ -310,6 +367,14 @@ int main(int argc, char **argv)
                 // check the exit status of the child process
                 if (WIFEXITED(status))
                 {
+                    // check if execution failed
+                    if (WEXITSTATUS(status) == CHILD_EXEC_ERR_CODE)
+                    {
+                        syslog(LOG_ERR, "failed to execute %s", option.target);
+                        syslog(LOG_ERR, "%s exited", prog_name);
+                        cleanup_and_exit(EXIT_FAILURE);
+                    }
+
                     // child exited normally
                     // check if respawn is needed
                     syslog(LOG_WARNING, "%s exited, status: %d", option.target, WEXITSTATUS(status));
