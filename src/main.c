@@ -242,26 +242,55 @@ static void graceful_shutdown(pid_t pid, const option_t *opt)
  */
 static void sigaction_handler(int sig_no)
 {
-    syslog(LOG_WARNING, "exit signal received: %s (%d)", strsignal(sig_no), sig_no);
+    switch (sig_no)
+    {
+    case SIGINT:
+    case SIGTERM:
+        syslog(LOG_WARNING, "shutdown signal received: %s (%d)", strsignal(sig_no), sig_no);
+        shutdown_requested = 1;
 
-    shutdown_requested = 1;
+        break;
+
+    case SIGCHLD:
+        // child exited
+        break;
+
+    default:
+        break;
+    }
 }
 
 /**
  * @brief Initialize signal handlers
  *
  */
-static void sigaction_init()
+static void sigaction_init(void)
 {
     struct sigaction sa;
 
     sa.sa_handler = sigaction_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sa.sa_flags |= SA_RESTART;
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
 
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGCHLD, &sa, NULL);
+}
+
+/**
+ * @brief Reset signal handler
+ *
+ */
+static void reset_sigaction(void)
+{
+    struct sigaction sa;
+
+    sa.sa_handler = SIG_DFL;
+    sigemptyset(&sa.sa_mask);
+
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGCHLD, &sa, NULL);
 }
 
 int main(int argc, char **argv)
@@ -301,6 +330,16 @@ int main(int argc, char **argv)
     bool respawn_required;
     unsigned int respawn_cnt = 0;
 
+    sigset_t mask, oldmask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    sigaddset(&mask, SIGTERM);
+    sigaddset(&mask, SIGINT);
+
+    sigaction_init();
+
+    sigprocmask(SIG_BLOCK, &mask, &oldmask);
+
     while (1)
     {
         pid = fork();
@@ -314,6 +353,13 @@ int main(int argc, char **argv)
         else if (pid == 0)
         {
             // here is child process
+
+            sigprocmask(SIG_SETMASK, &oldmask, NULL);
+            reset_sigaction();
+            if (runtimefds.pid_fd >= 0)
+            {
+                close(runtimefds.pid_fd);
+            }
 
             setsid();
             umask(0);
@@ -331,19 +377,17 @@ int main(int argc, char **argv)
             rc = set_user_and_group(&option);
             if (rc < 0)
             {
-                exit(CHILD_EXEC_ERR_CODE);
+                _exit(CHILD_EXEC_ERR_CODE);
             }
 
             syslog(LOG_INFO, "start to execute %s", option.target);
 
             execv(option.target, option.target_argv);
 
-            exit(CHILD_EXEC_ERR_CODE);
+            _exit(CHILD_EXEC_ERR_CODE);
         }
 
         // here is parent process
-
-        sigaction_init();
 
         while (1)
         {
@@ -410,7 +454,23 @@ int main(int argc, char **argv)
                 if (option.respawn_delay > 0)
                 {
                     syslog(LOG_INFO, "%s respawning in %d seconds", option.target, option.respawn_delay);
-                    sleep(option.respawn_delay);
+
+                    sigset_t wait_mask;
+                    sigemptyset(&wait_mask);
+                    sigaddset(&wait_mask, SIGTERM);
+                    sigaddset(&wait_mask, SIGINT);
+
+                    struct timespec timeout;
+                    timeout.tv_sec = option.respawn_delay;
+                    timeout.tv_nsec = 0;
+
+                    int sig = sigtimedwait(&wait_mask, NULL, &timeout);
+                    if (sig == SIGTERM || sig == SIGINT)
+                    {
+                        syslog(LOG_WARNING, "shutdown signal received: %s (%d)", strsignal(sig), sig);
+                        syslog(LOG_INFO, "%s exited", prog_name);
+                        cleanup_and_exit(EXIT_SUCCESS);
+                    }
                 }
                 else
                 {
@@ -421,7 +481,7 @@ int main(int argc, char **argv)
                 break;
             }
 
-            usleep(200 * 1000);
+            sigsuspend(&oldmask);
         }
     }
 
