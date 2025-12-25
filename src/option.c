@@ -94,9 +94,9 @@ static const char usage_text[] = {
  *
  * @param prog_name program name
  */
-static void show_usage(const char *prog_name)
+static void show_usage(FILE *stream, const char *prog_name)
 {
-    fprintf(stderr, usage_text, prog_name);
+    fprintf(stream, usage_text, prog_name);
 }
 
 /**
@@ -119,14 +119,14 @@ static int append_env(option_t *opt, const char *env)
     char *sep = strchr(env, '=');
     if (!sep || sep == env)
     {
-        fprintf(stderr, "error: invalid enviroment '%s'\n", env);
+        log_error("error: invalid enviroment '%s'", env);
         return -1;
     }
 
     char **temp = (char **)realloc(opt->environments, (opt->environment_cnt + 1) * sizeof(char **));
     if (!temp)
     {
-        fprintf(stderr, "%s", strerror(errno));
+        log_error("failed to realloc: %s", strerror(errno));
         return -1;
     }
 
@@ -158,12 +158,12 @@ static int parse_respawn_code(option_t *opt, const char *code_str)
     long code = strtol(code_str, &endptr, 10);
     if (errno == ERANGE || code > 127 || code < -1)
     {
-        fprintf(stderr, "failed to parse respawn code '%s': out of range [-1, 127]\n", code_str);
+        log_error("failed to parse respawn code '%s': out of range [-1, 127]", code_str);
         return -1;
     }
     else if (code_str == endptr || *endptr != '\0')
     {
-        fprintf(stderr, "failed to parse respawn code '%s': not a number\n", code_str);
+        log_error("failed to parse respawn code '%s': not a number", code_str);
         return -1;
     }
 
@@ -212,12 +212,12 @@ static int parse_respawn_delay(option_t *opt, const char *delay_str)
     long delay = strtol(delay_str, &endptr, 10);
     if (errno == ERANGE || delay < 0)
     {
-        fprintf(stderr, "failed to parse respawn delay '%s': out of range\n", delay_str);
+        log_error("failed to parse respawn delay '%s': out of range", delay_str);
         return -1;
     }
     else if (delay_str == endptr || *endptr != '\0')
     {
-        fprintf(stderr, "failed to parse respawn delay '%s': not a number\n", delay_str);
+        log_error("failed to parse respawn delay '%s': not a number", delay_str);
         return -1;
     }
 
@@ -246,12 +246,12 @@ static int parse_max_respawn_count(option_t *opt, const char *count_str)
     long count = strtol(count_str, &endptr, 10);
     if (errno == ERANGE || count < 0)
     {
-        fprintf(stderr, "failed to parse max respawns '%s': out of range\n", count_str);
+        log_error("failed to parse max respawns '%s': out of range", count_str);
         return -1;
     }
     else if (count_str == endptr || *endptr != '\0')
     {
-        fprintf(stderr, "failed to parse max respawns '%s': not a number\n", count_str);
+        log_error("failed to parse max respawns '%s': not a number", count_str);
         return -1;
     }
 
@@ -293,27 +293,27 @@ static int general_parse_file(char **dst, const char *file)
     dir = realpath(dir, buf3);
     if (!dir)
     {
-        fprintf(stderr, "%s: %s\n", buf2, strerror(errno));
+        log_error("%s: %s", buf2, strerror(errno));
         return -1;
     }
 
     rc = access(dir, F_OK | X_OK);
     if (rc != 0)
     {
-        fprintf(stderr, "%s: %s\n", dir, strerror(errno));
+        log_error("%s: %s", dir, strerror(errno));
         return -1;
     }
 
     rc = stat(dir, &st);
     if (rc != 0)
     {
-        fprintf(stderr, "%s: %s\n", dir, strerror(errno));
+        log_error("%s: %s", dir, strerror(errno));
         return -1;
     }
 
     if (!S_ISDIR(st.st_mode))
     {
-        fprintf(stderr, "%s: not a directory\n", dir);
+        log_error("%s: not a directory", dir);
         return -1;
     }
 
@@ -381,27 +381,27 @@ static int parse_working_dir(option_t *opt, const char *dir)
     abs_path = realpath(dir, abs_path_buf);
     if (!abs_path)
     {
-        fprintf(stderr, "%s: %s\n", dir, strerror(errno));
+        log_error("%s: %s", dir, strerror(errno));
         return -1;
     }
 
     rc = access(abs_path, F_OK | X_OK);
     if (rc != 0)
     {
-        fprintf(stderr, "%s: %s\n", abs_path, strerror(errno));
+        log_error("%s: %s", abs_path, strerror(errno));
         return -1;
     }
 
     rc = stat(abs_path, &st);
     if (rc != 0)
     {
-        fprintf(stderr, "%s: %s\n", abs_path, strerror(errno));
+        log_error("%s: %s", abs_path, strerror(errno));
         return -1;
     }
 
     if (!S_ISDIR(st.st_mode))
     {
-        fprintf(stderr, "%s: not a directory\n", abs_path);
+        log_error("%s: not a directory", abs_path);
         return -1;
     }
 
@@ -447,7 +447,7 @@ static int parse_user(option_t *opt, const char *user_str)
     struct passwd *pw = getpwnam(username);
     if (!pw)
     {
-        fprintf(stderr, "error: user '%s' not found\n", username);
+        log_error("error: user '%s' not found", username);
         free(username);
         return -1;
     }
@@ -461,7 +461,7 @@ static int parse_user(option_t *opt, const char *user_str)
         struct group *grp = getgrnam(group);
         if (!grp)
         {
-            fprintf(stderr, "error: group '%s' not found\n", group);
+            log_error("error: group '%s' not found", group);
             return -1;
         }
 
@@ -519,27 +519,27 @@ static int check_target(const char *target)
 
     if (target[0] != '/')
     {
-        fprintf(stderr, "target must be an absolute path.\n");
+        log_error("error: target must be an absolute path");
         return -1;
     }
 
     rc = access(target, F_OK | X_OK);
     if (rc != 0)
     {
-        fprintf(stderr, "%s: %s\n", target, strerror(errno));
+        log_error("%s: %s", target, strerror(errno));
         return -1;
     }
 
     rc = stat(target, &st);
     if (rc != 0)
     {
-        fprintf(stderr, "%s: %s\n", target, strerror(errno));
+        log_error("%s: %s", target, strerror(errno));
         return -1;
     }
 
     if (!S_ISREG(st.st_mode))
     {
-        fprintf(stderr, "%s: not a file\n", target);
+        log_error("%s: not a file", target);
         return -1;
     }
 
@@ -683,17 +683,17 @@ int parse_option(int argc, char **argv, option_t *opt)
             break;
 
         case OPT_VERSION:
-            printf("%s\n", VERSION_NAME);
+            fprintf(stdout, "%s\n", VERSION_NAME);
             return 0;
             break;
 
         case OPT_HELP:
-            show_usage(prog_name);
+            show_usage(stdout, prog_name);
             return 0;
             break;
 
         default:
-            show_usage(prog_name);
+            show_usage(stderr, prog_name);
             rc = -1;
             break;
         }
@@ -706,8 +706,8 @@ int parse_option(int argc, char **argv, option_t *opt)
 
     if (optind >= argc)
     {
-        fprintf(stderr, "error: missing target program\n");
-        show_usage(prog_name);
+        log_error("error: missing target program");
+        show_usage(stderr, prog_name);
         return -1;
     }
 

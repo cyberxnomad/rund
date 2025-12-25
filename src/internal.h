@@ -18,6 +18,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/types.h>
 
 #define RESPAWN_CODE_BITS_ARRAY_SIZE 4
 #define RESPAWN_CODE_BITS_ELEM_WIDTH 32
@@ -81,5 +82,25 @@ typedef struct
 #define RUNTIMEFDS_INITIALIZER {-1, -1, -1}
 
 int daemonize(const char *pid_file);
+
+enum LOG_LEVEL
+{
+    LOG_LEVEL_DEBUG,
+    LOG_LEVEL_INFO,
+    LOG_LEVEL_WARN,
+    LOG_LEVEL_ERROR,
+    LOG_LEVEL_FATAL,
+};
+
+int log_init(const char *ident);
+void log_enable_syslog(void);
+
+void log_log(enum LOG_LEVEL level, const char *fmt, ...);
+
+#define log_debug(...) log_log(LOG_LEVEL_DEBUG, __VA_ARGS__)
+#define log_info(...)  log_log(LOG_LEVEL_INFO, __VA_ARGS__)
+#define log_warn(...)  log_log(LOG_LEVEL_WARN, __VA_ARGS__)
+#define log_error(...) log_log(LOG_LEVEL_ERROR, __VA_ARGS__)
+#define log_fatal(...) log_log(LOG_LEVEL_FATAL, __VA_ARGS__)
 
 #endif // _INTERNAL_H_

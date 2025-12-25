@@ -115,7 +115,7 @@ static void redirect_std_fds(const option_t *opt, runtimefds_t *fds)
         }
         else
         {
-            syslog(LOG_ERR, "failed to open %s: %s", option.stdout_file, strerror(errno));
+            log_error("failed to open %s: %s", option.stdout_file, strerror(errno));
         }
     }
 
@@ -128,7 +128,7 @@ static void redirect_std_fds(const option_t *opt, runtimefds_t *fds)
         }
         else
         {
-            syslog(LOG_ERR, "failed to open %s: %s", option.stderr_file, strerror(errno));
+            log_error("failed to open %s: %s", option.stderr_file, strerror(errno));
         }
     }
 }
@@ -153,21 +153,21 @@ static int set_user_and_group(const option_t *opt)
     rc = initgroups(opt->user, opt->gid);
     if (rc < 0)
     {
-        syslog(LOG_ERR, "failed to init groups: %s", strerror(errno));
+        log_error("failed to init groups: %s", strerror(errno));
         return -1;
     }
 
     rc = setgid(opt->gid);
     if (rc < 0)
     {
-        syslog(LOG_ERR, "failed to set group: %s", strerror(errno));
+        log_error("failed to switch group: %s", strerror(errno));
         return -1;
     }
 
     rc = setuid(opt->uid);
     if (rc < 0)
     {
-        syslog(LOG_ERR, "failed to set user: %s", strerror(errno));
+        log_error("failed to switch user: %s", strerror(errno));
         return -1;
     }
 
@@ -229,7 +229,7 @@ static void graceful_shutdown(pid_t pid, const option_t *opt)
     }
 
     // timed out and force to kill
-    syslog(LOG_WARNING, "waiting for %s to exit timed out; force terminating it", opt->target);
+    log_warn("waiting for %s to exit timed out; force terminating it", opt->target);
     kill(pid, SIGKILL);
 
     waitpid(pid, NULL, 0);
@@ -238,15 +238,15 @@ static void graceful_shutdown(pid_t pid, const option_t *opt)
 /**
  * @brief Signal handler for process management
  *
- * @param sig_no signal number received
+ * @param sig signal number received
  */
-static void sigaction_handler(int sig_no)
+static void sigaction_handler(int sig)
 {
-    switch (sig_no)
+    switch (sig)
     {
     case SIGINT:
     case SIGTERM:
-        syslog(LOG_WARNING, "shutdown signal received: %s (%d)", strsignal(sig_no), sig_no);
+        log_warn("shutdown signal received: %s (%d)", strsignal(sig), sig);
         shutdown_requested = 1;
 
         break;
@@ -298,6 +298,8 @@ int main(int argc, char **argv)
     int rc;
     char *prog_name = basename(argv[0]);
 
+    log_init(prog_name);
+
     rc = parse_option(argc, argv, &option);
     switch (rc)
     {
@@ -312,8 +314,6 @@ int main(int argc, char **argv)
     default:
         break;
     }
-
-    openlog(prog_name, LOG_PID, LOG_DAEMON);
 
     rc = daemonize(option.pid_file);
     if (rc < 0)
@@ -345,9 +345,8 @@ int main(int argc, char **argv)
         pid = fork();
         if (pid < 0)
         {
-            syslog(LOG_ERR, "failed to fork: %s", strerror(errno));
-
-            syslog(LOG_ERR, "%s exited", prog_name);
+            log_error("failed to fork: %s", strerror(errno));
+            log_error("%s exited", prog_name);
             cleanup_and_exit(EXIT_FAILURE);
         }
         else if (pid == 0)
@@ -380,7 +379,7 @@ int main(int argc, char **argv)
                 _exit(CHILD_EXEC_ERR_CODE);
             }
 
-            syslog(LOG_INFO, "start to execute %s", option.target);
+            log_info("start to execute %s", option.target);
 
             execv(option.target, option.target_argv);
 
@@ -393,11 +392,11 @@ int main(int argc, char **argv)
         {
             if (shutdown_requested)
             {
-                syslog(LOG_INFO, "graceful shutdown %s", option.target);
+                log_info("graceful shutdown %s", option.target);
 
                 graceful_shutdown(pid, &option);
 
-                syslog(LOG_INFO, "%s exited", prog_name);
+                log_info("%s exited", prog_name);
                 cleanup_and_exit(EXIT_SUCCESS);
             }
 
@@ -414,46 +413,46 @@ int main(int argc, char **argv)
                     // check if execution failed
                     if (WEXITSTATUS(status) == CHILD_EXEC_ERR_CODE)
                     {
-                        syslog(LOG_ERR, "failed to execute %s", option.target);
-                        syslog(LOG_ERR, "%s exited", prog_name);
+                        log_error("failed to execute %s", option.target);
+                        log_error("%s exited", prog_name);
                         cleanup_and_exit(EXIT_FAILURE);
                     }
 
                     // child exited normally
                     // check if respawn is needed
-                    syslog(LOG_WARNING, "%s exited, status: %d", option.target, WEXITSTATUS(status));
+                    log_warn("%s exited, status: %d", option.target, WEXITSTATUS(status));
                     respawn_required = check_respawn_required(&option, WEXITSTATUS(status));
                 }
                 else if (WIFSIGNALED(status))
                 {
                     // child terminated by a signal
-                    syslog(LOG_WARNING, "%s exited, signal: %s (%d)", option.target, strsignal(WTERMSIG(status)), WTERMSIG(status));
+                    log_warn("%s exited, signal: %s (%d)", option.target, strsignal(WTERMSIG(status)), WTERMSIG(status));
                 }
                 else
                 {
                     // child exited abnormally without a clear signal or exit status
-                    syslog(LOG_WARNING, "%s exited abnormal", option.target);
+                    log_warn("%s exited abnormal", option.target);
                 }
 
                 // increment respawn counter and check against the configured maximum
                 respawn_cnt++;
                 if (option.max_respawn_cnt && respawn_cnt > option.max_respawn_cnt)
                 {
-                    syslog(LOG_INFO, "maximum respawn attempts reached for %s", option.target);
-                    syslog(LOG_INFO, "%s exited", prog_name);
+                    log_info("maximum respawn attempts reached for %s", option.target);
+                    log_info("%s exited", prog_name);
                     cleanup_and_exit(EXIT_SUCCESS);
                 }
 
                 // exit if respawning is not required
                 if (!respawn_required)
                 {
-                    syslog(LOG_INFO, "%s exited", prog_name);
+                    log_info("%s exited", prog_name);
                     cleanup_and_exit(EXIT_SUCCESS);
                 }
 
                 if (option.respawn_delay > 0)
                 {
-                    syslog(LOG_INFO, "%s respawning in %d seconds", option.target, option.respawn_delay);
+                    log_info("%s respawning in %d seconds", option.target, option.respawn_delay);
 
                     sigset_t wait_mask;
                     sigemptyset(&wait_mask);
@@ -467,14 +466,14 @@ int main(int argc, char **argv)
                     int sig = sigtimedwait(&wait_mask, NULL, &timeout);
                     if (sig == SIGTERM || sig == SIGINT)
                     {
-                        syslog(LOG_WARNING, "shutdown signal received: %s (%d)", strsignal(sig), sig);
-                        syslog(LOG_INFO, "%s exited", prog_name);
+                        log_warn("shutdown signal received: %s (%d)", strsignal(sig), sig);
+                        log_info("%s exited", prog_name);
                         cleanup_and_exit(EXIT_SUCCESS);
                     }
                 }
                 else
                 {
-                    syslog(LOG_INFO, "%s respawning immediately", option.target);
+                    log_info("%s respawning immediately", option.target);
                 }
 
                 // exit the loop to respawn the child process
@@ -485,6 +484,6 @@ int main(int argc, char **argv)
         }
     }
 
-    syslog(LOG_INFO, "%s exited", prog_name);
+    log_info("%s exited", prog_name);
     cleanup_and_exit(EXIT_SUCCESS);
 }

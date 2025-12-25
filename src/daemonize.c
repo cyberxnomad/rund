@@ -20,6 +20,8 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include "internal.h"
+
 /**
  * @brief Lock pid file
  *
@@ -51,14 +53,14 @@ int test_running(const char *pid_file)
     int fd = open(pid_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd < 0)
     {
-        fprintf(stderr, "failed to open %s: %s\n", pid_file, strerror(errno));
+        log_error("failed to open %s: %s", pid_file, strerror(errno));
         return -1;
     }
 
     // try to lock pid file
     if (lock_pid_file(fd) < 0)
     {
-        fprintf(stderr, "failed to lock %s (already running?): %s\n", pid_file, strerror(errno));
+        log_error("failed to lock %s (already running?): %s", pid_file, strerror(errno));
 
         close(fd);
         return -1;
@@ -98,7 +100,7 @@ int daemonize(const char *pid_file)
 
         if (pipe(pipefd) < 0)
         {
-            fprintf(stderr, "failed to create pipe: %s\n", strerror(errno));
+            log_error("failed to create pipe: %s\n", strerror(errno));
             return -1;
         }
     }
@@ -106,7 +108,7 @@ int daemonize(const char *pid_file)
     pid = fork();
     if (pid < 0)
     {
-        fprintf(stderr, "failed to fork: %s\n", strerror(errno));
+        log_error("failed to fork: %s\n", strerror(errno));
 
         if (pid_file)
         {
@@ -135,6 +137,10 @@ int daemonize(const char *pid_file)
     }
 
     // here is child process, pid is 0
+
+    // switch log output to syslog
+    log_enable_syslog();
+
     if (pid_file)
     {
         char sync_r;
@@ -161,7 +167,7 @@ int daemonize(const char *pid_file)
     int null_fd = open("/dev/null", O_RDWR);
     if (null_fd < 0)
     {
-        syslog(LOG_ERR, "failed to open /dev/null: %s", strerror(errno));
+        log_error("failed to open /dev/null: %s", strerror(errno));
 
         if (pid_file)
         {
