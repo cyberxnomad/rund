@@ -164,7 +164,7 @@ static int set_user_and_group(const option_t *opt)
         return -1;
     }
 
-    rc = setuid(opt->gid);
+    rc = setuid(opt->uid);
     if (rc < 0)
     {
         syslog(LOG_ERR, "failed to set user: %s", strerror(errno));
