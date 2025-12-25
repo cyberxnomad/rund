@@ -115,6 +115,14 @@ static int append_env(option_t *opt, const char *env)
         return 0;
     }
 
+    // check if env is valid
+    char *sep = strchr(env, '=');
+    if (!sep || sep == env)
+    {
+        fprintf(stderr, "error: invalid enviroment '%s'\n", env);
+        return -1;
+    }
+
     char **temp = (char **)realloc(opt->environments, (opt->environment_cnt + 1) * sizeof(char **));
     if (!temp)
     {
