@@ -20,6 +20,7 @@
 #include <stdlib.h>
 
 #define RESPAWN_CODE_BITS_ARRAY_SIZE 4
+#define RESPAWN_CODE_BITS_ELEM_WIDTH 32
 
 typedef struct
 {

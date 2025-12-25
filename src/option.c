@@ -171,13 +171,13 @@ static int parse_respawn_code(option_t *opt, const char *code_str)
     {
         for (int i = 0; i < RESPAWN_CODE_BITS_ARRAY_SIZE; i++)
         {
-            if (code < 32)
+            if (code < RESPAWN_CODE_BITS_ELEM_WIDTH)
             {
                 opt->respawn_code_bits[i] |= 1 << code;
                 break;
             }
 
-            code -= 32;
+            code -= RESPAWN_CODE_BITS_ELEM_WIDTH;
         }
     }
 

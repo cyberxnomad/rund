@@ -55,12 +55,12 @@ static bool check_respawn_required(const option_t *opt, int code)
 
     for (int i = 0; i < RESPAWN_CODE_BITS_ARRAY_SIZE; i++)
     {
-        if (code < 32)
+        if (code < RESPAWN_CODE_BITS_ELEM_WIDTH)
         {
             return opt->respawn_code_bits[i] & (1 << code);
         }
 
-        code -= 32;
+        code -= RESPAWN_CODE_BITS_ELEM_WIDTH;
     }
 
     return false;
