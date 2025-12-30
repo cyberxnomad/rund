@@ -19,7 +19,6 @@ set(CMAKE_C_EXTENSIONS ON)
 set(COMPILE_OPTS
     -ffunction-sections
     -fdata-sections
-    -fstack-protector-strong
 
     -Wall
     -Wfloat-equal
