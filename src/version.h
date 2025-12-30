@@ -16,8 +16,8 @@
 
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 1
-#define VERSION_PATCH 0
+#define VERSION_PATCH 1
 
-#define VERSION_NAME  "v0.1.0"
+#define VERSION_NAME  "v0.1.1"
 
 #endif // _VERSION_H_
